@@ -1,5 +1,4 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const schedule = require('node-schedule');
 const dayjs = require('dayjs'); 
 require('dayjs/locale/id');
@@ -7,15 +6,61 @@ dayjs.locale('id');
 
 const express = require('express');
 const app = express();
+const path = require('path');
+const fs = require('fs');
+const qrcode = require('qrcode');
+
+const PUBLIC_DIR = path.join(__dirname, 'public');
+if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR);
 
 app.get('/', (req, res) => res.send('WhatsApp Bot is running ✅'));
-app.listen(process.env.PORT || 3000);
 
-const client = new Client({
-    authStrategy: new LocalAuth()
+app.get('/khataman-qr.png', (req, res) => {
+  const file = path.join(PUBLIC_DIR, 'khataman-qr.png');
+  if (fs.existsSync(file)) {
+    res.sendFile(file);
+  } else {
+    res.status(404).send('QR belum tersedia. Tunggu beberapa detik setelah service start.');
+  }
 });
 
-client.on('qr', qr => qrcode.generate(qr, { small: true }));
+app.listen(process.env.PORT || 3000, () => {
+  console.log('🌐 Server Express aktif di port', process.env.PORT || 3000);
+});
+
+const client = new Client({
+  authStrategy: new LocalAuth(),
+  puppeteer: {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ]
+  }
+});
+
+client.on('qr', async qr => {
+  console.log('📸 Membuat file QR: public/khataman-qr.png');
+  try {
+    await qrcode.toFile(path.join(PUBLIC_DIR, 'khataman-qr.png'), qr);
+    console.log('✅ QR disimpan. Buka: https://<your-service>.onrender.com/khataman-qr.png');
+  } catch (err) {
+    console.error('❌ Gagal menyimpan QR:', err);
+  }
+});
+
+client.on('authenticated', () => {
+  const file = path.join(PUBLIC_DIR, 'khataman-qr.png');
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+});
+client.on('auth_failure', msg => console.log('❌ Gagal autentikasi:', msg));
+
 client.on('ready', async () => {
     const chats = await client.getChats();
     const groups = chats.filter(chat => chat.isGroup);
