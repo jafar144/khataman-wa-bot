@@ -5,6 +5,12 @@ const dayjs = require('dayjs');
 require('dayjs/locale/id');
 dayjs.locale('id');
 
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => res.send('WhatsApp Bot is running ✅'));
+app.listen(process.env.PORT || 3000);
+
 const client = new Client({
     authStrategy: new LocalAuth()
 });
